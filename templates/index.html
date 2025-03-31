@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webhook Viewer Lite</title>
+    <script>
+        function loadWebhooks() {
+            fetch('/webhooks')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('webhook-list');
+                    container.innerHTML = "";
+                    data.reverse().forEach(webhook => { // Show newest first
+                        const pre = document.createElement('pre');
+                        pre.textContent = JSON.stringify(webhook, null, 2);
+                        container.appendChild(pre);
+                    });
+                });
+        }
+
+        function sendRequest(url) {
+            fetch(url, { method: 'POST' })
+                .then(() => loadWebhooks());
+        }
+
+        function downloadWebhooks() {
+            fetch('/save', { method: 'POST' })
+                .then(response => response.blob()) // Convert response to file blob
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = "webhooks.json"; // Force download
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                })
+                .catch(error => console.error("Download failed:", error));
+        }
+
+        setInterval(loadWebhooks, 5000); // Refresh every 5 sec
+        window.onload = loadWebhooks;
+    </script>
+</head>
+<body>
+    <h1>Webhook Viewer</h1>
+    <button onclick="sendRequest('/clear')">Clear Webhooks</button>
+    <button onclick="downloadWebhooks()">Download Webhooks</button>
+    <button onclick="sendRequest('/delete')">Delete All Webhooks</button>
+
+    <div id="webhook-list" style="border: 1px solid black; padding: 10px; height: 600px; overflow: auto;"></div>
+</body>
+</html>
