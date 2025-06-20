@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_file, Response
+from flask import Flask, request, jsonify, render_template, Response
 import json
 import os
 
@@ -6,13 +6,17 @@ app = Flask(__name__)
 
 WEBHOOK_FILE = "webhooks.json"
 
-# Function to save a webhook to a file
-def save_webhook(data):
+# Save a webhook to file, including headers
+def save_webhook(headers, body):
+    webhook = {
+        "headers": dict(headers),
+        "body": body
+    }
     with open(WEBHOOK_FILE, "a") as file:
-        json.dump(data, file)
-        file.write("\n")  # New line for each webhook
+        json.dump(webhook, file)
+        file.write("\n")
 
-# Function to load webhooks from the file
+# Load stored webhooks
 def load_webhooks():
     if not os.path.exists(WEBHOOK_FILE):
         return []
@@ -22,19 +26,22 @@ def load_webhooks():
 @app.route('/')
 def index():
     webhooks = load_webhooks()
-    return render_template('index.html', webhooks=webhooks[::-1])  # Show latest first
+    return render_template('index.html', webhooks=webhooks[::-1])  # Show newest first
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    if request.is_json:
-        data = request.get_json()
-        save_webhook(data)  # Save webhook to file
+    try:
+        body = request.get_json(force=True, silent=True)
+        if body is None:
+            body = request.data.decode('utf-8')  # fallback for non-JSON
+        save_webhook(request.headers, body)
         return jsonify({"message": "Webhook received"}), 200
-    return jsonify({"error": "Invalid JSON"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Invalid payload. {str(e)}"}), 400
 
 @app.route('/webhooks', methods=['GET'])
 def get_webhooks():
-    return jsonify(load_webhooks()[::-1])  # Return latest first
+    return jsonify(load_webhooks()[::-1])
 
 @app.route('/clear', methods=['POST'])
 def clear_webhooks():
