@@ -6,35 +6,34 @@ app = Flask(__name__)
 
 WEBHOOK_FILE = "webhooks.json"
 
-# Save a webhook to file, including headers
-def save_webhook(headers, body):
+# Save a webhook to file, including headers and raw body text
+def save_webhook(headers, raw_body_text):
     webhook = {
         "headers": dict(headers),
-        "body": body
+        "body": raw_body_text  # raw JSON text as string
     }
-    with open(WEBHOOK_FILE, "a") as file:
+    with open(WEBHOOK_FILE, "a", encoding="utf-8") as file:
         json.dump(webhook, file)
         file.write("\n")
 
-# Load stored webhooks
+# Load stored webhooks from file
 def load_webhooks():
     if not os.path.exists(WEBHOOK_FILE):
         return []
-    with open(WEBHOOK_FILE, "r") as file:
+    with open(WEBHOOK_FILE, "r", encoding="utf-8") as file:
         return [json.loads(line) for line in file if line.strip()]
 
 @app.route('/')
 def index():
     webhooks = load_webhooks()
-    return render_template('index.html', webhooks=webhooks[::-1])  # Show newest first
+    return render_template('index.html', webhooks=webhooks[::-1])  # newest first
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
-        body = request.get_json(force=True, silent=True)
-        if body is None:
-            body = request.data.decode('utf-8')  # fallback for non-JSON
-        save_webhook(request.headers, body)
+        # Get the exact raw JSON body text as string (no parsing)
+        raw_body = request.get_data(as_text=True)
+        save_webhook(request.headers, raw_body)
         return jsonify({"message": "Webhook received"}), 200
     except Exception as e:
         return jsonify({"error": f"Invalid payload. {str(e)}"}), 400
